@@ -6,7 +6,10 @@ def generate_hash(opportunity: dict):
     relevant_fields = {
         "title": opportunity.get("title"),
         "description": opportunity.get("description"),
-        "deadline": opportunity.get("deadline"),
+        "deadline": opportunity.get("response_deadline") or opportunity.get("deadline"),
+        "naics_codes": opportunity.get("naics_codes"),
+        "set_aside": opportunity.get("set_aside"),
+        "notice_type": opportunity.get("notice_type"),
     }
 
     encoded = json.dumps(relevant_fields, sort_keys=True).encode()
