@@ -24,7 +24,7 @@ data/           Local opportunity data cache
 ## Requirements
 - Python 3.10+
 - Node 18+
-- Ollama installed
+- NVIDIA API key (Integrate API)
 
 ## Setup
 
@@ -35,29 +35,29 @@ python -m venv .venv
 pip install -r requirements.txt
 ```
 
-### 2) Ollama
-```bash
-ollama serve
-ollama pull llama3.1:8b
-```
-
-### 3) Environment
+### 2) Environment
 Create `.env` in repo root:
 ```
-OLLAMA_MODEL=llama3.1:8b
+NVIDIA_API_KEY=your_key_here
+NVIDIA_BASE_URL=https://integrate.api.nvidia.com/v1
+NVIDIA_MODEL=deepseek-ai/deepseek-v3.1
+NVIDIA_TEMPERATURE=0.2
+NVIDIA_TOP_P=0.7
+NVIDIA_MAX_TOKENS=4096
+NVIDIA_THINKING=false
 ```
 
-### 4) Ingest data
+### 3) Ingest data
 ```bash
 python .\scripts\run_ingestion.py
 ```
 
-### 5) Run backend
+### 4) Run backend
 ```bash
 python -m uvicorn backend.main:app --reload --port 8000
 ```
 
-### 6) Run frontend
+### 5) Run frontend
 ```bash
 cd frontend
 npm install
@@ -85,10 +85,11 @@ POST /generate/refine                Refine section (edit/expand/regenerate)
 - `docs/rag-workflow.md` – RAG workflow
 - `docs/system-prompt.md` – system prompt used
 - `docs/prototype-link.md` – prototype instructions
+Prototype link (v0): https://v0.app/chat/proposal-review-screen-hZbs6h8eghS?ref=LYDNIE
 
 ---
 
 ## Notes
 - SAM descriptions can return 404/429; proposal falls back to metadata context in that case.
 - PDF extraction is best‑effort; some attachments may not parse.
-- For heavier responses, set `OLLAMA_MODEL` to a larger model (e.g., `llama3.1:70b`) if your machine can handle it.
+- For longer drafts, increase `NVIDIA_MAX_TOKENS` if your quota allows it.

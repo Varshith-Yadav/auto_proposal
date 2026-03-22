@@ -6,5 +6,5 @@ numpy
 faiss-cpu
 pypdf
 sentence-transformers
-langchain-ollama
+openai
 python-dotenv
