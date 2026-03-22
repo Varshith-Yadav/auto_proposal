@@ -1,0 +1,83 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "GovPreneursOpportunity",
+  "type": "object",
+  "required": ["id", "title", "posted_date", "source"],
+  "properties": {
+    "id": { "type": "string", "description": "SAM.gov noticeId" },
+    "title": { "type": "string" },
+    "description": { "type": ["string", "null"], "description": "SAM description URL or plain text" },
+    "short_description": { "type": ["string", "null"], "description": "Short summary text when available" },
+    "description_text": { "type": ["string", "null"], "description": "Cached description text (HTML stripped)" },
+    "solicitation_number": { "type": ["string", "null"] },
+    "notice_type": { "type": ["string", "null"] },
+    "base_type": { "type": ["string", "null"] },
+    "archive_type": { "type": ["string", "null"] },
+    "archive_date": { "type": ["string", "null"], "format": "date" },
+    "set_aside": { "type": ["string", "null"] },
+    "set_aside_description": { "type": ["string", "null"] },
+    "naics_primary": { "type": ["string", "null"] },
+    "naics_codes": { "type": "array", "items": { "type": "string" } },
+    "classification_code": { "type": ["string", "null"] },
+    "response_deadline": { "type": ["string", "null"], "format": "date-time" },
+    "posted_date": { "type": ["string", "null"], "format": "date" },
+    "agency": {
+      "type": "object",
+      "properties": {
+        "name": { "type": ["string", "null"] },
+        "code": { "type": ["string", "null"] }
+      },
+      "additionalProperties": false
+    },
+    "award": {
+      "type": ["object", "null"],
+      "properties": {
+        "date": { "type": ["string", "null"], "format": "date" },
+        "number": { "type": ["string", "null"] },
+        "amount": { "type": ["string", "number", "null"] },
+        "awardee": {
+          "type": ["object", "null"],
+          "properties": {
+            "name": { "type": ["string", "null"] },
+            "uei": { "type": ["string", "null"] },
+            "cage_code": { "type": ["string", "null"] }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "points_of_contact": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "fullName": { "type": ["string", "null"] },
+          "email": { "type": ["string", "null"] },
+          "phone": { "type": ["string", "null"] },
+          "type": { "type": ["string", "null"] },
+          "title": { "type": ["string", "null"] }
+        },
+        "additionalProperties": true
+      }
+    },
+    "documents": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["url"],
+        "properties": {
+          "title": { "type": ["string", "null"] },
+          "url": { "type": "string" },
+          "type": { "type": ["string", "null"] },
+          "description": { "type": ["string", "null"] }
+        },
+        "additionalProperties": false
+      }
+    },
+    "active": { "type": ["string", "boolean", "null"] },
+    "status": { "type": ["string", "null"] },
+    "source": { "type": "string", "enum": ["sam.gov"] }
+  },
+  "additionalProperties": true
+}
