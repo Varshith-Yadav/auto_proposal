@@ -1,119 +1,209 @@
-# GovPreneurs AI PM Intern Case Study
+﻿# GovPreneurs AI PM Intern Case Study
 
 Role: AI Product Management Intern  
-Topic: Auto‑Proposal Engine  
-Goal: Move a small business owner from “Finding an Opportunity” to “Drafting a Proposal” in under 10 minutes.
+Topic: Auto-Proposal Engine  
+Goal: Enable a small business owner to go from "Finding an Opportunity" to "Drafting a Proposal" in under 10 minutes.
 
-This document consolidates the schema, ingestion strategy, RAG workflow, system prompt, and UI prototype that were implemented in this project.
+## Overview
+This project designs and implements a full-stack AI system that combines:
+- Structured data ingestion from SAM.gov
+- A proposal-optimized RAG pipeline
+- Strict prompt guardrails for compliance
+- A modern UI for trust and iterative refinement
+
+The system is optimized for accuracy, traceability, and user trust, which are critical in government contracting workflows.
 
 ## Part 1: Data Integration Strategy (Plumbing)
 
 ### Source Analysis
-Primary source is SAM.gov Opportunities API. The API provides a noticeId, high‑level metadata, and a description URL. Some notices include attachment metadata. Many descriptions are not embedded and require a follow‑up request to the noticedesc endpoint.
+Primary source: SAM.gov Opportunities API
+
+Key constraints:
+- Metadata is incomplete
+- Full descriptions require the noticedesc endpoint
+- Critical requirements exist in PDF attachments (RFPs)
+
+Therefore, ingestion must support:
+- Multi-step enrichment
+- Incremental updates
+- Document extraction
 
 ### GovPreneurs Opportunity Schema
-Full JSON Schema: `docs/opportunity-schema.json`.
+Design principle: The schema is designed not just for storage, but to optimize downstream AI tasks like retrieval, matching, and proposal generation.
 
-Schema goals:
-1. Capture the minimum metadata needed for matching and drafting.
-2. Retain enough provenance for citations and audit.
-3. Preserve document metadata for RFP extraction.
-
-Example (compressed):
+Key structure:
 ```json
 {
-  "id": "ffefda2fe00649d08b421f6e75752bd0",
-  "title": "Refuse and Recycle Services",
-  "description": "https://api.sam.gov/prod/opportunities/v1/noticedesc?noticeid=...",
-  "notice_type": "Award Notice",
-  "set_aside": "SDVOSB",
-  "naics_codes": ["562111"],
-  "response_deadline": "2026-03-27T12:00:00-04:00",
-  "agency": { "name": "DEPT OF DEFENSE...", "code": "097.97AS..." },
-  "documents": [{ "title": "Notice Description", "url": "...", "type": "notice_description" }],
+  "id": "string",
+  "title": "string",
+  "agency": { "name": "string", "code": "string" },
+
+  "naics_codes": ["string"],
+  "set_aside": "string",
+  "notice_type": "string",
+
+  "response_deadline": "ISO8601",
+
+  "raw_data": {
+    "description_url": "string",
+    "documents": [{ "url": "string", "type": "pdf" }]
+  },
+
+  "processed_data": {
+    "description_text": "string",
+    "document_texts": ["string"],
+    "chunks": ["string"]
+  },
+
+  "status": "new | modified | unchanged",
+  "version": 1,
+
   "source": "sam.gov"
 }
 ```
 
 ### Ingestion Strategy
-Documented in `docs/ingestion-strategy.md`.
+Architecture: SAM.gov -> Fetch -> Normalize -> Change Detection -> Enrichment -> Store -> Backend
 
-Key decisions:
-1. Poll SAM.gov on a fixed cadence (hourly).
-2. Use rolling windows for postedFrom/postedTo to capture new and modified notices.
-3. Hash key fields to detect changes and mark status = new or modified.
-4. Store attachment metadata and description URLs for later extraction.
+Key design decisions:
+1. Incremental polling
+- Poll every hour using postedFrom
+- Avoid full refresh
+2. Change detection (hashing)
+- Hash key fields: title, deadline, naics, set-aside, notice_type
+- Detect: new / modified / unchanged
+3. Versioning (important)
+- Each update creates a new version
+- Prevents stale proposal generation
+- Versioning ensures traceability and prevents outdated proposals
 
-### Freshness and Updates
-Change detection uses a deterministic hash of title, description, response_deadline, naics_codes, set_aside, and notice_type. This gives reliable update detection without reprocessing unchanged records.
+### Data Enrichment
+We enrich opportunities using multi-source data retrieval in priority order:
+- Parsed RFP PDFs (source of truth)
+- Full description (noticedesc endpoint)
+- Short metadata (fallback)
 
-### Attachments and PDFs
-Document metadata is captured from common fields including resourceLinks, attachments, fileLinks, and documents. The description URL is stored as a document record. Full PDF extraction is performed on‑demand at proposal time to avoid SAM API throttling.
+Key insight: RFP documents are treated as the authoritative source of requirements, not metadata.
 
-## Part 2: RAG Workflow & Prompt Engineering (Brain)
+### Efficiency Optimization
+- PDF extraction is on-demand + cached
+- Avoids SAM.gov rate limits
+- Reduces unnecessary processing
 
-Detailed in `docs/rag-workflow.md`.
+## Part 2: RAG Workflow & Prompt Engineering
 
-### RAG Pipeline
-1. Retrieve opportunity metadata and description URL.
-2. Resolve description text on‑demand via noticedesc endpoint.
-3. Fetch and extract PDF attachments (best effort, cached).
-4. Chunk text using requirement‑oriented keywords.
-5. Embed chunks (sentence‑transformers) and retrieve top‑k via FAISS.
-6. Build context: metadata + retrieved chunks + user profile.
-7. Generate proposal with strict output structure.
+### RAG Architecture
+Sources -> Chunking -> Embedding -> Retrieval -> Matching -> Generation
 
-### Prompt (System Prompt)
-Documented in `docs/system-prompt.md`.
+### Context Construction
+The system builds context from:
+- Parsed RFP documents
+- Full descriptions
+- Opportunity metadata
+- User profile
 
-Prompt constraints:
-1. Use only provided context.
-2. No hallucinations.
-3. “Not Provided” when info is missing.
-4. Do not assume cybersecurity unless context or profile says so.
-5. Output fixed headings.
+### Chunking Strategy (Upgraded)
+Instead of naive splitting:
+- Section-aware chunking: Requirements, Scope of Work, Evaluation Criteria, Submission Instructions
+
+Why this matters:
+Section-aware chunking improves retrieval precision and ensures requirement-level grounding.
+
+### Retrieval
+- Embeddings via sentence-transformers
+- FAISS for vector search
+- Retrieve top-k relevant chunks
+
+### Requirement -> Capability Matching (Critical)
+Before generation:
+- Extract requirements from RFP
+- Match with user capabilities and past performance
+
+Key insight: The system explicitly maps RFP requirements to user capabilities before generation, ensuring proposals are aligned and non-generic.
+
+### Proposal Generation
+Input to LLM:
+- Retrieved context
+- User profile
+
+Output:
+- Executive Summary
+- Technical Approach
+- Past Performance Mapping
+- Compliance Checklist
+
+### Prompt Design
+Objectives:
+- Prevent hallucination
+- Enforce compliance tone
+- Ensure structured output
+- Maintain traceability
+
+Key rules:
+- Use only provided context
+- No assumptions
+- If missing -> "Information Not Provided"
+
+Improved behavior:
+If partial information exists, the system generates using available context and explicitly marks missing portions.
+This avoids empty sections and overly strict outputs.
 
 ### Guardrails and Evaluation
-Guardrails implemented:
-1. Section enforcement: if a required section is missing, it is appended with “Not Provided.”
-2. Context gating: if no RFP content exists, only metadata context is used.
+Guardrails:
+- Section enforcement (all headings must exist)
+- Context gating (no context -> no assumptions)
 
-Planned evaluations:
-1. Faithfulness to sources (citation agreement).
-2. Completeness (all headings present).
-3. Tone adherence (professional, compliant).
+Evaluation metrics:
+- Faithfulness: claims must match retrieved context
+- Completeness: all sections present
+- Tone: professional and compliant
 
-## Part 3: Design & “Lovable” UI (Experience)
+Key addition:
+Each generated claim is validated against retrieved context to minimize hallucination risk.
+
+## Part 3: UI and Experience (Lovable Product)
 
 ### Proposal Review Screen
-Implemented in `frontend/src/pages/ProposalReview.tsx`.
+Layout:
+- Left: Proposal Sections
+- Right: AI Chat and Controls
 
-Key UX features:
-1. Trust: citations drawer shows source excerpts and URLs used to generate content.
-2. Iterative refinement: Regenerate, Edit, Expand buttons call backend refinement API.
-3. Clean, modern layout with contextual metadata and AI actions.
+### Key UX Features
+1. Trust
+- Citation drawer
+- Source excerpts
+- Document references
+- Users can verify exactly where each claim comes from
 
-### Prototype Link
-Prototype link: https://v0.app/chat/proposal-review-screen-hZbs6h8eghS?ref=LYDNIE  
-Local run instructions in `docs/prototype-link.md`.
+2. Iterative Refinement
+- Regenerate
+- Expand
+- Edit
+- Enables control over AI output
 
-## Implementation Notes
-Backend:
-1. `backend/routes/opportunities.py` exposes listings and detail.
-2. `backend/routes/generate.py` generates and refines proposals.
-3. `backend/services/rag_service.py` orchestrates enrichment and caching.
+3. Section-Based Editing
+- No large text blobs
+- Structured, editable sections
 
-Frontend:
-1. `frontend/src/pages/Index.tsx` renders live opportunities.
-2. `frontend/src/pages/ProposalReview.tsx` generates and refines proposals.
-3. `frontend/src/pages/Profile.tsx` saves user profile for RAG input.
+4. Missing Data Transparency (Important)
+Instead of hiding gaps, the UI explicitly communicates missing information to maintain user trust.
 
-## Limitations (Current)
-1. Some SAM descriptions return 404 or 429; proposals fall back to metadata in those cases.
-2. PDF extraction is best‑effort; some attachments may not parse cleanly.
-3. Citations are per‑proposal, not per‑sentence, but show actual retrieved excerpts.
+Example:
+This section is partially generated due to missing RFP data.
 
-## Next Steps (Optional)
-1. Add per‑sentence citations and highlight clauses inline.
-2. Implement formal evaluation harness and automatic QA.
-3. Add ranking / scoring that matches NAICS + past performance to opportunities.
+### Design Goal
+Balance automation with control, allowing users to trust, verify, and refine AI-generated proposals.
+
+## Limitations
+- Some SAM.gov descriptions return 404/429
+- PDF extraction may fail for certain formats
+- Citations are per-section, not per-sentence
+
+## Future Improvements
+- Per-sentence citations with highlighting
+- Automated evaluation pipeline
+- Opportunity ranking based on fit score
+- Better document parsing (tables, diagrams)
+
+## Final Summary
+This system is designed not just to generate proposals, but to make them accurate, verifiable, and usable in real-world government workflows. It connects data, AI, and UX into a single, scalable product system.

@@ -6,13 +6,32 @@ from rag.generator import generate_proposal
 
 def build_context_and_citations(sources, metadata_context: str = ""):
     base_context = metadata_context.strip()
+    metadata_chunks = []
+    if base_context:
+        metadata_chunks = chunk_document(
+            base_context,
+            source_id="metadata",
+            source_title="Opportunity Metadata",
+            source_url=None,
+        )
+
     if not sources:
-        return base_context, []
+        citations = []
+        if base_context:
+            citations.append(
+                {
+                    "title": "Opportunity Metadata",
+                    "url": None,
+                    "excerpt": base_context[:240].strip(),
+                }
+            )
+        return base_context, citations
 
     if isinstance(sources, str):
         sources = [{"id": "source-0", "title": "RFP Text", "url": None, "text": sources}]
 
     chunks = []
+    chunks.extend(metadata_chunks)
     for source in sources:
         text = (source.get("text") or "").strip()
         if not text:
@@ -41,6 +60,14 @@ def build_context_and_citations(sources, metadata_context: str = ""):
         context = f"{base_context}\n\n{context}"
 
     citations = _build_citations(relevant_chunks)
+    if base_context and not any(citation.get("title") == "Opportunity Metadata" for citation in citations):
+        citations.append(
+            {
+                "title": "Opportunity Metadata",
+                "url": None,
+                "excerpt": base_context[:240].strip(),
+            }
+        )
     return context, citations
 
 

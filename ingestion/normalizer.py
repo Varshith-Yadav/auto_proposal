@@ -4,7 +4,14 @@ def normalize(raw):
     documents = _extract_documents(raw)
 
     description = raw.get("description")
+    short_description = None
     if isinstance(description, str) and description.startswith("http"):
+        short_description = (
+            raw.get("shortDescription")
+            or raw.get("synopsis")
+            or raw.get("summary")
+            or raw.get("shortDesc")
+        )
         documents.append(
             {
                 "title": "Notice Description",
@@ -12,11 +19,15 @@ def normalize(raw):
                 "type": "notice_description",
             }
         )
+    else:
+        if isinstance(description, str) and description.strip():
+            short_description = description.strip()
 
     return {
         "id": raw.get("noticeId"),
         "title": raw.get("title"),
         "description": description,
+        "short_description": short_description,
         "solicitation_number": raw.get("solicitationNumber"),
         "notice_type": raw.get("type"),
         "base_type": raw.get("baseType"),

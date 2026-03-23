@@ -52,10 +52,16 @@ def refine_proposal_section(opportunity_id: str, user_profile: dict, section_tit
 def _build_metadata_context(opportunity: dict) -> str:
     lines = [
         f"OPPORTUNITY TITLE: {opportunity.get('title')}",
+        f"SOLICITATION NUMBER: {opportunity.get('solicitation_number')}",
+        f"NOTICE TYPE: {opportunity.get('notice_type')}",
+        f"SET ASIDE: {opportunity.get('set_aside_description') or opportunity.get('set_aside')}",
         f"AGENCY: {(opportunity.get('agency') or {}).get('name')}",
         f"DEADLINE: {opportunity.get('response_deadline')}",
         f"POSTED DATE: {opportunity.get('posted_date')}",
         f"NAICS CODES: {', '.join(opportunity.get('naics_codes') or [])}",
+        f"AWARD AMOUNT: {(opportunity.get('award') or {}).get('amount')}",
+        f"AWARDEE: {((opportunity.get('award') or {}).get('awardee') or {}).get('name')}",
+        f"SUMMARY: {opportunity.get('short_description')}",
         f"STATUS: {opportunity.get('status')}",
     ]
     return "\n".join(line for line in lines if line and line.split(": ", 1)[-1] not in ("None", ""))
@@ -115,7 +121,7 @@ def _resolve_document_texts(opportunity_id: str, opportunity: dict, db: dict) ->
     collected = []
     updated_entries = []
 
-    for doc in documents[:2]:
+    for doc in documents:
         url = doc.get("url")
         if not url or not _is_pdf_document(doc, url):
             continue
@@ -139,6 +145,19 @@ def _resolve_document_texts(opportunity_id: str, opportunity: dict, db: dict) ->
 
 def _build_sources(opportunity_id: str, opportunity: dict, db: dict) -> list[dict]:
     sources = []
+
+    # Priority: parsed PDF text first
+    for idx, doc in enumerate(_resolve_document_texts(opportunity_id, opportunity, db)):
+        sources.append(
+            {
+                "id": f"{opportunity_id}-doc-{idx}",
+                "title": doc.get("title") or "Attachment",
+                "url": doc.get("url"),
+                "text": doc.get("text"),
+            }
+        )
+
+    # Then full description
     description_text = _resolve_description_text(opportunity_id, opportunity, db)
     if description_text:
         sources.append(
@@ -150,13 +169,15 @@ def _build_sources(opportunity_id: str, opportunity: dict, db: dict) -> list[dic
             }
         )
 
-    for idx, doc in enumerate(_resolve_document_texts(opportunity_id, opportunity, db)):
+    # Then short description fallback
+    short_description = opportunity.get("short_description")
+    if isinstance(short_description, str) and short_description.strip():
         sources.append(
             {
-                "id": f"{opportunity_id}-doc-{idx}",
-                "title": doc.get("title") or "Attachment",
-                "url": doc.get("url"),
-                "text": doc.get("text"),
+                "id": f"{opportunity_id}-short",
+                "title": "Opportunity Summary",
+                "url": None,
+                "text": short_description.strip(),
             }
         )
 

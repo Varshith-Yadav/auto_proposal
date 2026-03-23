@@ -1,9 +1,10 @@
 from fastapi import FastAPI
 from dotenv import load_dotenv
 from fastapi.middleware.cors import CORSMiddleware
-from backend.routes import generate, opportunities
 
 load_dotenv()
+
+from backend.routes import generate, opportunities
 
 app = FastAPI(title="GovPreneurs AI API")
 
